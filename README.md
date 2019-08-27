@@ -1,6 +1,6 @@
 # trackfront
 
-a project to track performance and exception of front end
+a project to track performance and exception of frontend
 
 ## QuickStart
 ```
