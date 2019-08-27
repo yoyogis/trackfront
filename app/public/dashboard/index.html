@@ -1,0 +1,929 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Socket.IO chat</title>
+  <link rel="icon" href="http://doc.talkingdata.com/resource/img/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="ele.css">
+  <link rel="stylesheet" type="text/css" href="./style.css">
+
+  <script type="text/javascript" src="vue.js"></script>
+  <script src="echarts-en.common.min.js"></script>
+  <script src="ele.js"></script>
+  <script src="socket.io.js"></script>
+  <script src="client.js"></script>
+  <script src="../jslib/jquery.js"></script>
+</head>
+
+<body>
+  <style>
+    .app {
+      width: 100%;
+      height: 100%;
+      background: #f1f2f4;
+    }
+
+    .app-wrap {
+      height: calc(100% - 40px - 32px - 77px);
+      padding: 0 16px 16px;
+      overflow: scroll;
+    }
+
+    .header {
+      background: #1f3159;
+      width: 100%;
+      height: 50px;
+    }
+
+    h3 {
+      color: #000;
+      font-weight: bold;
+      font-size: 16px;
+      padding: 4px 1px;
+      font-size: 14px;
+    }
+
+    .header h2 {
+      font-size: 16px;
+      text-align: center;
+      line-height: 50px;
+      color: #FFF;
+      position: relative;
+    }
+
+    .header h2 img {
+      width: 104px;
+      height: 21px;
+      float: left;
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      margin-top: -8px
+    }
+
+    .main {
+      background: #fff;
+      margin-bottom: 16px;
+      line-height: 45px;
+      box-shadow: 0 1px 2px 0 rgba(23, 35, 61, 0.35);
+      padding: 16px;
+      border-radius: 2px;
+    }
+
+    .main label {
+      padding-right: 16px;
+      min-width: 170px;
+      display: inline-block;
+    }
+
+    .main span b {
+      color: rgba(23, 35, 61, 0.55);
+      padding-left: 10px;
+    }
+
+    .main-left {
+      height: 100%;
+      width: calc(100% - 500px);
+    }
+
+    .main-right {
+      width: 500px;
+    }
+
+    .flex {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: -ms-flexbox;
+      display: flex;
+    }
+  </style>
+  <!-- <ul id="messages"></ul> -->
+  <div id='app' class='app'>
+    <header class='header'>
+      <h2><img src="https://kms.talkingdata.com/ui-ext/logo/15c9afc84039ce6bdaffda540c0930d7.png" alt="">前端优化</h2>
+    </header>
+    <div class="main">
+      <span style="font-size:12px;padding-right: 10px;">请选择sessionID: </span>
+      <el-select v-model="value" placeholder="请选择" :size='"small"' @change="changeSelect">
+        <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value">
+        </el-option>
+      </el-select>
+    </div>
+    <div class='app-wrap'>
+      <!-- 浏览器 基础信息 -->
+      <h3>基础信息</h3>
+      <section class='main'>
+        <div>
+          <label for="">客户端系统:</label>
+          <span>{{basic.navigator_platform}}</span>
+        </div>
+        <div>
+          <label for="">返回浏览器名称:</label>
+          <span>{{basic.navigator_appName}}</span>
+        </div>
+        <div>
+          <label for="">返回浏览器及版本信息:</label>
+          <span>{{basic.navigator_userAgent}}</span>
+        </div>
+        <div>
+          <label for="">浏览器默认语言:</label>
+          <span>{{basic.navigator_language}}</span>
+        </div>
+        <div>
+          <label for="">url:</label>
+          <span>{{basic.location_herf}}</span>
+        </div>
+        <div>
+          <label for="">页面刷新频率:</label>
+          <span>{{refreshRate.rate}}</span>
+        </div>
+      </section>
+      <h3>请求</h3>
+      <section class="main flex">
+        <div class='main-left'>
+          <div>
+            <label for="">ajax请求总数:</label>
+            <span>{{ajaxCount}}</span>
+          </div>
+          <div>
+            <label for="">成功的ajax请求数:</label>
+            <span>{{successAjaxCount}}</span>
+          </div>
+          <div>
+            <label for="">失败的ajax请求数:</label>
+            <span>{{ajaxErrorCount}}</span>
+          </div>
+          <div>
+            <label for="">ajax请求成功率:</label>
+            <span>{{ajaxCount == 0?0+'%' : (successAjaxCount / ajaxCount * 100).toFixed(2) + '%'}}</span>
+          </div>
+        </div>
+        <div class='main-right' id='echartAjax' style='height: 184px;'></div>
+      </section>
+      <h3>内存</h3>
+      <!-- 内存 -->
+      <section class='main flex'>
+        <div class='main-left'>
+          <div>
+            <label for="">占用内存:</label>
+            <span>{{memory.usedJSHeapSize}}</span>
+          </div>
+          <div>
+            <label for="">可使用的内存:</label>
+            <span>{{memory.totalJSHeapSize}}</span>
+          </div>
+          <div>
+            <label for="">内存大小限制</label>
+            <span>{{memory.jsHeapSizeLimit}}</span>
+          </div>
+        </div>
+        <div class='main-right' id='echartMemory' style='height: 184px;'></div>
+      </section>
+      <!-- 性能 -->
+      <h3>性能</h3>
+      <section class='main'>
+        <div v-for='(value,key) in timing' :key='key'>
+          <label for="">{{key}}:</label>
+          <span>{{value}}<b>ms</b></span>
+        </div>
+        </template>
+      </section>
+      <h3>实时监控异常数量</h3>
+      <div class='main' id="echartError" style="height:400px;"></div>
+      <h3>前端错误捕获列表</h3>
+      <div style="margin-bottom: 16px;">
+        <el-table :data="webErrData" border style="width: 100%" max-height="500">
+          <el-table-column show-overflow-tooltip prop="message" label="错误名称" width="">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="stack" label="错误栈" width="">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="location_herf" label="错误URL">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="timestamp" :formatter="formatDate" label="错误时间">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="errType" label="错误类型">
+          </el-table-column>
+        </el-table>
+      </div>
+      <h3>后端错误捕获列表</h3>
+      <div style="margin-bottom: 16px;">
+        <el-table :data="ajaxErrorData" border style="width: 100%" max-height="500">
+          <el-table-column show-overflow-tooltip prop="response" label="错误返回" width="">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="responseURL" label="返回错误URL" width="">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="status" label="错误状态">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="statusText" label="错误描述">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="errType" label="错误类型">
+          </el-table-column>
+        </el-table>
+      </div>
+      <h3>实时监控页面内某个区域操作频率</h3>
+      <div class='main' id="echartEvent" style="height:400px;">
+      </div>
+      <h3>事件捕获列表</h3>
+      <div style="margin-bottom: 16px;">
+        <el-table :data="eventData" border style="width: 100%" max-height="500">
+          <el-table-column show-overflow-tooltip prop="target" label="事件目标" width="">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="eventName" label="事件名称" width="">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="total" label="事件次数" width="">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="location_herf" label="事件URL">
+          </el-table-column>
+          <el-table-column show-overflow-tooltip prop="timestamp" :formatter="formatDate" label="事件时间">
+          </el-table-column>
+        </el-table>
+      </div>
+
+    </div>
+  </div>
+  </div>
+  </div>
+  <script>
+    var app = new Vue({
+      el: '#app',
+      data() {
+        return {
+          basic: {},
+          memory: {},
+          timing: {},
+          allErrData: [],
+          webErrData: [],
+          ajaxErrorData: [],
+          eventData: [],
+          sessionArr: [],
+          myChartError: null,
+          myChartEvent: null,
+          myCharteAjax: null,
+          myCharteMemory: null,
+          ajaxCount: 0,
+          ajaxErrorCount: 0,
+          successAjaxCount: 0,
+          options: [],
+          value: '',
+          refreshRate: {},
+          optionError: {
+            title: {
+              text: ''
+            },
+            grid: {
+              top: 50,
+              left: '3%',
+              right: '4%',
+              bottom: '3%',
+              containLabel: true
+            },
+            tooltip: {
+              trigger: 'axis',
+              axisPointer: {
+                animation: false
+              }
+            },
+            formatter: function (params) {
+              params = params[0];
+              var date = new Date(params.name);
+              //     var h = date.getHours();
+              // var m = date.getMinutes();
+              // var s = date.getSeconds();
+              return date.getFullYear() + '/' + (date.getMonth() + 1) + '/' + date.getDate() + ' ' + date.getHours() +
+                ':' + date.getMinutes() + ':' + date.getSeconds() + ' - ' + params.value[
+                  1];
+            },
+            xAxis: {
+              type: 'time',
+              splitLine: {
+                show: false
+              },
+
+            },
+            yAxis: {
+              type: 'value',
+              boundaryGap: [0, '100%'],
+              splitLine: {
+                show: false
+              }
+            },
+            series: [{
+              name: '',
+              type: 'line',
+              showSymbol: false,
+              hoverAnimation: false,
+              // areaStyle: {},
+              markPoint: {
+                data: [{
+                  type: 'max',
+                  name: '最大值'
+                }, {
+                  type: 'min',
+                  name: '最小值'
+                }]
+              },
+              markLine: {
+                data: [{
+                  type: 'average',
+                  name: '平均值'
+                }]
+              },
+              data: []
+            }],
+            // dataZoom: [{
+            //     show: true,
+            //     realtime: true,
+            //     start: 65,
+            //     end: 85
+            //   },
+            //   {
+            //     type: 'inside',
+            //     realtime: true,
+            //     start: 65,
+            //     end: 85
+            //   }
+            // ],
+          },
+          optionEvent: {
+            title: {
+              // text: '某地区蒸发量和降水量',
+              // subtext: '纯属虚构'
+            },
+            grid: {
+              // top: 50,
+              left: '3%',
+              right: '4%',
+              bottom: '3%',
+              containLabel: true
+            },
+            tooltip: {
+              trigger: 'axis'
+            },
+            legend: {
+              // data: ['蒸发量', '降水量']
+            },
+            toolbox: {
+              show: true,
+              feature: {
+                // dataView: {
+                //   show: true,
+                //   readOnly: false
+                // },
+                magicType: {
+                  show: true,
+                  type: ['line', 'bar']
+                },
+                // restore: {
+                //   show: true
+                // },
+                // saveAsImage: {
+                //   show: true
+                // }
+              }
+            },
+            calculable: true,
+            xAxis: [{
+              type: 'category',
+              data: []
+            }],
+            yAxis: [{
+              type: 'value'
+            }],
+            series: [{
+              // name: '蒸发量',
+              type: 'bar',
+              data: [],
+              barWidth: '10%',
+              markPoint: {
+                data: [{
+                  type: 'max',
+                  name: '最大值'
+                }, {
+                  type: 'min',
+                  name: '最小值'
+                }]
+              },
+              markLine: {
+                data: [{
+                  type: 'average',
+                  name: '平均值'
+                }]
+              },
+              itemStyle: {
+                normal: {
+                  color: new echarts.graphic.LinearGradient(
+                    0, 0, 0, 1, [{
+                      offset: 0,
+                      color: '#83bff6'
+                    }, {
+                      offset: 0.5,
+                      color: '#188df0'
+                    }, {
+                      offset: 1,
+                      color: '#188df0'
+                    }]
+                  )
+                },
+                emphasis: {
+                  color: new echarts.graphic.LinearGradient(
+                    0, 0, 0, 1, [{
+                      offset: 0,
+                      color: '#2378f7'
+                    }, {
+                      offset: 0.7,
+                      color: '#2378f7'
+                    }, {
+                      offset: 1,
+                      color: '#83bff6'
+                    }]
+                  )
+                }
+              },
+            }]
+          },
+
+
+          yAxis: {
+            type: 'value',
+            boundaryGap: [0, '100%'],
+            splitLine: {
+              show: false
+            }
+          },
+          series: [{
+            name: '',
+            type: 'line',
+            showSymbol: false,
+            hoverAnimation: false,
+            markPoint: {
+              data: [{
+                type: 'max',
+                name: '最大值'
+              }, {
+                type: 'min',
+                name: '最小值'
+              }]
+            },
+            markLine: {
+              data: [{
+                type: 'average',
+                name: '平均值'
+              }]
+            },
+            data: []
+          }],
+
+          optionEvent: {
+            title: {
+              // text: '某地区蒸发量和降水量',
+              // subtext: '纯属虚构'
+            },
+            grid: {
+              // top: 50,
+              left: '3%',
+              right: '4%',
+              bottom: '3%',
+              containLabel: true
+            },
+            tooltip: {
+              trigger: 'axis'
+            },
+            legend: {
+              // data: ['蒸发量', '降水量']
+            },
+            toolbox: {
+              show: true,
+              feature: {
+                // dataView: {
+                //   show: true,
+                //   readOnly: false
+                // },
+                magicType: {
+                  show: true,
+                  type: ['line', 'bar']
+                },
+                // restore: {
+                //   show: true
+                // },
+                // saveAsImage: {
+                //   show: true
+                // }
+              }
+            },
+            calculable: true,
+            xAxis: [{
+              type: 'category',
+              data: []
+            }],
+            yAxis: [{
+              type: 'value'
+            }],
+            series: [{
+              // name: '蒸发量',
+              type: 'bar',
+              data: [],
+              barWidth: '10%',
+              markPoint: {
+                data: [{
+                  type: 'max',
+                  name: '最大值'
+                }, {
+                  type: 'min',
+                  name: '最小值'
+                }]
+              },
+              markLine: {
+                data: [{
+                  type: 'average',
+                  name: '平均值'
+                }]
+              },
+              itemStyle: {
+                normal: {
+                  color: new echarts.graphic.LinearGradient(
+                    0, 0, 0, 1, [{
+                      offset: 0,
+                      color: '#83bff6'
+                    }, {
+                      offset: 0.5,
+                      color: '#188df0'
+                    }, {
+                      offset: 1,
+                      color: '#188df0'
+                    }]
+                  )
+                },
+                emphasis: {
+                  color: new echarts.graphic.LinearGradient(
+                    0, 0, 0, 1, [{
+                      offset: 0,
+                      color: '#2378f7'
+                    }, {
+                      offset: 0.7,
+                      color: '#2378f7'
+                    }, {
+                      offset: 1,
+                      color: '#83bff6'
+                    }]
+                  )
+                }
+              },
+            }]
+          },
+          optionAjax: {
+            tooltip: {
+              trigger: 'item',
+              formatter: "{a} <br/>{b}: {c} ({d}%)"
+            },
+            color: ['rgb(45, 140, 240)', '#f07f30'],
+            legend: {
+              orient: 'vertical',
+              right: 16,
+              data: ['成功的ajax请求数', '失败的ajax请求数']
+            },
+            series: [{
+              name: '访问来源',
+              type: 'pie',
+              radius: ['50%', '70%'],
+              avoidLabelOverlap: false,
+              label: {
+                normal: {
+                  textStyle: {
+                    fontSize: 12,
+                    // color: '#235894'
+                  }
+                },
+
+              },
+              labelLine: {
+                normal: {
+                  lineStyle: {
+                    // color: '#235894'
+                  }
+                }
+              },
+              data: []
+            }]
+          },
+          optionMemory: {
+            tooltip: {
+              trigger: 'item',
+              formatter: "{a} <br/>{b}: {c} ({d}%)"
+            },
+            color: ['rgb(45, 140, 240)', '#f07f30'],
+            legend: {
+              orient: 'vertical',
+              right: 16,
+              data: ['占用内存', '可使用内存']
+            },
+            series: [{
+              type: 'pie',
+              radius: ['50%', '70%'],
+              avoidLabelOverlap: false,
+              label: {
+                normal: {
+                  textStyle: {
+                    fontSize: 12,
+                    // color: '#235894'
+                  }
+                },
+
+              },
+              labelLine: {
+                normal: {
+                  lineStyle: {
+                    // color: '#235894'
+                  }
+                }
+              },
+              data: []
+            }]
+          }
+        }
+      },
+      mounted() {
+        this.initEchart();
+        this.requestPercent();
+      },
+      watch: {
+        'successAjaxCount'() {
+          this.onAjaxChart()
+        },
+        'ajaxErrorCount'() {
+          this.onAjaxChart()
+        },
+      },
+      methods: {
+        initData(data) {
+          if (data.ajaxError && data.ajaxError.length) {
+            this.ajaxErrorData = this.ajaxErrorData.concat(data.ajaxError);
+            this.allErrData = this.allErrData.concat(data.ajaxError);
+            for (let i = 0; i < this.ajaxErrorData.length; i++) {
+              this.ajaxErrorData[i].errType = '后端错误';
+            }
+          }
+
+          if (data.error && data.error.length) {
+            this.webErrData = this.webErrData.concat(data.error);
+            this.allErrData = this.allErrData.concat(data.error);
+            for (let i = 0; i < this.webErrData.length; i++) {
+              this.webErrData[i].errType = '前端错误';
+            }
+
+          }
+          if ((data.ajaxError && data.ajaxError.length) || (data.error && data.error.length)) {
+            this.setErrorOption()
+          }
+
+          if (data.ajaxCount) {
+            this.ajaxCount = data.ajaxCount
+          }
+          if (data.successAjaxCount) {
+            this.successAjaxCount = data.successAjaxCount;
+          }
+          if (data.ajaxErrorCount) {
+            this.ajaxErrorCount = data.ajaxErrorCount;
+          }
+          if (data.newSessionId) {
+            this.sessionArr.push(data.newSessionId);
+            this.fillSelect();
+          }
+          if (data.event && data.event.length) {
+            data.event.forEach(element => {
+              element['total'] = 1;
+            })
+            let eventValue = data.event;
+            if (this.eventData.length == 0) {
+              list = [data.event[0]]
+              eventValue = eventValue.slice(1)
+            } else {
+              list = this.eventData
+            }
+            eventValue.forEach(element => {
+              let idx = true;
+              list.forEach(item => {
+                if (element.target == item.target) {
+                  idx = false;
+                  item.total = item.total + 1
+                }
+              })
+              if (idx && element.eventName != "load") {
+                list.push(element)
+              }
+            });
+            this.eventData = list;
+            this.setEveentOption();
+          }
+          if (data.memory) {
+            this.memory = data.memory;
+            this.myCharteMemory.setOption({
+              series: [{
+                data: [{
+                  value: data.memory.usedJSHeapSize,
+                  name: '占用内存'
+                }, {
+                  value: data.memory.totalJSHeapSize,
+                  name: '可使用内存'
+                }, ]
+              }]
+            });
+          }
+          if (data.basic) {
+            this.basic = data.basic;
+          }
+          if (data.timing) {
+            let time = data.timing;
+            let timingObj = {};
+            timingObj['重定向时间'] = (time.redirectEnd - time.redirectStart);
+            timingObj['DNS解析时间'] = (time.domainLookupEnd - time.domainLookupStart);
+            timingObj['TCP完成握手时间'] = (time.connectEnd - time.connectStart);
+            timingObj['HTTP请求响应完成时间'] = (time.responseEnd - time.requestStart);
+            timingObj['DOM开始加载前所花费时间'] = (time.responseEnd - time.navigationStart);
+            timingObj['DOM加载完成时间'] = (time.domComplete - time.domLoading);
+            timingObj['DOM结构解析完成时间'] = (time.domInteractive - time.domLoading);
+            timingObj['脚本加载时间'] = (time.domContentLoadedEventEnd - time.domContentLoadedEventStart);
+            timingObj['onload事件时间'] = (time.loadEventEnd - time.loadEventStart);
+            timingObj['白屏时间'] = (time.domLoading - time.fetchStart);
+            timingObj['页面完全加载时间'] = (timingObj['重定向时间'] + timingObj['DNS解析时间'] + timingObj['TCP完成握手时间'] + timingObj[
+              'HTTP请求响应完成时间'] + timingObj['DOM结构解析完成时间'] + timingObj['DOM加载完成时间']);
+            this.timing = timingObj;
+          }
+          if (data.refreshRate) {
+            this.refreshRate = data.refreshRate;
+          }
+
+        },
+        initEchart() {
+          this.clearEchart();
+          this.myChartError = echarts.init(document.getElementById('echartError'));
+          this.myChartEvent = echarts.init(document.getElementById('echartEvent'));
+          this.myCharteAjax = echarts.init(document.getElementById('echartAjax'));
+          this.myCharteMemory = echarts.init(document.getElementById('echartMemory'));
+          // 指定图表的配置项和数据
+          this.myChartError.setOption(this.optionError);
+          window.addEventListener('resize', this.myChartError.resize);
+          this.myChartEvent.setOption(this.optionEvent);
+          window.addEventListener('resize', this.myChartEvent.resize);
+          this.myCharteAjax.setOption(this.optionAjax);
+          window.addEventListener('resize', this.myCharteAjax.resize);
+          this.myCharteMemory.setOption(this.optionMemory);
+          window.addEventListener('resize', this.myCharteMemory.resize);
+
+        },
+        clearEchart() {
+          if (this.myChartError) {
+            window.removeEventListener('resize', this.myChartError.resize, false);
+            this.myChartError.dispose();
+            this.myChartError = null;
+          }
+          if (this.myChartEvent) {
+            window.removeEventListener('resize', this.myChartEvent.resize, false);
+            this.myChartEvent.dispose();
+            this.myChartEvent = null;
+          }
+          if (this.myCharteAjax) {
+            window.removeEventListener('resize', this.myCharteAjax.resize, false);
+            this.myCharteAjax.dispose();
+            this.myCharteAjax = null;
+          }
+          if (this.myCharteMemory) {
+            window.removeEventListener('resize', this.myCharteMemory.resize, false);
+            this.myCharteMemory.dispose();
+            this.myCharteMemory = null;
+          }
+        },
+        dispatchAction() {
+          let theme = document.getElementById('echartError');
+          var ec = echarts.getInstanceByDom(theme);
+          ec.dispatchAction({
+            type: 'showTip',
+            dataIndex: this.allErrData.length - 1,
+            seriesIndex: 0
+          });
+        },
+        // 事件
+        setEveentOption() {
+          let data = [];
+          let arr = [];
+          for (let i = 0; i < this.eventData.length; i++) {
+            arr.push(this.eventData[i].target);
+            data.push(this.eventData[i].total);
+          }
+          this.myChartEvent.setOption({
+            xAxis: {
+              data: arr
+            },
+            series: [{
+              data: data
+            }]
+          });
+        },
+        formatDate(row, column) {
+          var date = new Date(Number(row.timestamp));
+          var Y = date.getFullYear();
+          var M = (date.getMonth() + 1 < 10 ? '0' + (date.getMonth() + 1) : date.getMonth() + 1);
+          var D = date.getDate();
+          var h = date.getHours();
+          var m = date.getMinutes();
+          var s = date.getSeconds();
+          return Y + '-' + M + '-' + D + ' ' + h + ':' + m + ':' + s;
+        },
+        requestPercent() {
+          let that = this;
+          $.ajax({
+            xhrFields: {
+              withCredentials: true
+            },
+            type: "get",
+            data: {},
+            url: "http://localhost:7001/track/sessions",
+            dataType: "json",
+            success: function (data) {
+              console.log(data, 'session-id');
+              that.sessionArr = data;
+              that.fillSelect();
+            },
+            error: function () {
+              console.log('fail');
+            }
+          });
+        },
+        fillSelect() {
+          if (this.sessionArr.length) {
+            this.options = [];
+            for (let i = 0; i < this.sessionArr.length; i++) {
+              this.options.push({
+                value: this.sessionArr[i],
+                label: this.sessionArr[i]
+              });
+            }
+            this.value = this.options[0].value;
+            socketClient.filter({
+              sessionId: this.value
+            });
+          }
+          console.log(this.options, 'options');
+        },
+        onAjaxChart() {
+          let that = this;
+          this.myCharteAjax.setOption({
+            series: [{
+              data: [{
+                value: that.successAjaxCount,
+                name: '成功的ajax请求数'
+              }, {
+                value: that.ajaxErrorCount,
+                name: '失败的ajax请求数'
+              }, ]
+            }]
+          })
+        },
+        changeSelect(val) {
+          socketClient.filter({
+            sessionId: val
+          });
+          this.webErrData = [];
+          this.ajaxErrorData = [];
+          this.eventData = [];
+          this.basic = {};
+          this.memory = {};
+          this.timing = {};
+          this.allErrData = [];
+          this.webErrData = [];
+          this.eventData = [];
+          this.ajaxCount = 0;
+          this.ajaxErrorCount = 0;
+          this.successAjaxCount = 0;
+          this.myChartError.dispose();
+          this.clearEchart();
+          this.initEchart();
+        },
+        // error 
+        setErrorOption() {
+          let that = this;
+          let data = [];
+          this.allErrData.sort((a, b) => {
+            return a.timestamp - b.timestamp;
+          })
+          for (let i = 0; i < this.allErrData.length; i++) {
+            data.push({
+              name: new Date(),
+              value: [Number(this.allErrData[i].timestamp), i + 1]
+            });
+          }
+          this.myChartError.setOption({
+            series: [{
+              data: data
+            }]
+          });
+          this.dispatchAction()
+        },
+      }
+    });
+    socketClient.onTrack(function (data) {
+      app.initData(data);
+    })
+  </script>
+</body>
+
+</html>
